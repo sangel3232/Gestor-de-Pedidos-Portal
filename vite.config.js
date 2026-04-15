@@ -4,9 +4,14 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
+    port: 5173,
     proxy: {
-      '/clientes': 'http://localhost:8080',
-      '/pedidos': 'http://localhost:8080',
+      '/auth':      { target: 'http://localhost:8080', changeOrigin: true },
+      '/clientes':  { target: 'http://localhost:8080', changeOrigin: true },
+      '/pedidos':   { target: 'http://localhost:8080', changeOrigin: true },
+      '/productos': { target: 'http://localhost:8080', changeOrigin: true },
+      '/carrito':   { target: 'http://localhost:8080', changeOrigin: true },
+      '/pagos':     { target: 'http://localhost:8080', changeOrigin: true },
     }
   }
 })
