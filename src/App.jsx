@@ -1,22 +1,70 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
-import Clientes from "./pages/Clientes";
-import Pedidos from "./pages/Pedidos";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 
-function PrivateRoute({ children }) {
-  return localStorage.getItem("user") ? children : <Navigate to="/" />;
+// Auth
+import Login from "./pages/Login";
+
+// Admin
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminProductos from "./pages/admin/AdminProductos";
+import AdminClientes from "./pages/admin/AdminClientes";
+import AdminPedidos from "./pages/admin/AdminPedidos";
+import AdminPagos from "./pages/admin/AdminPagos";
+
+// Usuario
+import Tienda from "./pages/usuario/Tienda";
+import MisPedidos from "./pages/usuario/MisPedidos";
+import MisPagos from "./pages/usuario/MisPagos";
+
+// Rutas protegidas por rol
+function RequireAuth({ children, rol }) {
+  const { session } = useAuth();
+  if (!session) return <Navigate to="/" replace />;
+  if (rol && session.rol !== rol) {
+    // Redirigir al área correcta si el rol no coincide
+    return <Navigate to={session.rol === "ADMIN" ? "/admin/dashboard" : "/tienda"} replace />;
+  }
+  return children;
+}
+
+function AppRoutes() {
+  const { session } = useAuth();
+
+  return (
+    <Routes>
+      {/* Público */}
+      <Route path="/"
+        element={
+          session
+            ? <Navigate to={session.rol === "ADMIN" ? "/admin/dashboard" : "/tienda"} replace />
+            : <Login />
+        }
+      />
+
+      {/* Admin */}
+      <Route path="/admin/dashboard" element={<RequireAuth rol="ADMIN"><AdminDashboard /></RequireAuth>} />
+      <Route path="/admin/productos"  element={<RequireAuth rol="ADMIN"><AdminProductos /></RequireAuth>} />
+      <Route path="/admin/clientes"   element={<RequireAuth rol="ADMIN"><AdminClientes /></RequireAuth>} />
+      <Route path="/admin/pedidos"    element={<RequireAuth rol="ADMIN"><AdminPedidos /></RequireAuth>} />
+      <Route path="/admin/pagos"      element={<RequireAuth rol="ADMIN"><AdminPagos /></RequireAuth>} />
+
+      {/* Usuario */}
+      <Route path="/tienda"         element={<RequireAuth rol="USUARIO"><Tienda /></RequireAuth>} />
+      <Route path="/tienda/pedidos" element={<RequireAuth rol="USUARIO"><MisPedidos /></RequireAuth>} />
+      <Route path="/tienda/pagos"   element={<RequireAuth rol="USUARIO"><MisPagos /></RequireAuth>} />
+
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
 }
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Login />} />
-        <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-        <Route path="/clientes" element={<PrivateRoute><Clientes /></PrivateRoute>} />
-        <Route path="/pedidos" element={<PrivateRoute><Pedidos /></PrivateRoute>} />
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
