@@ -37,5 +37,6 @@ export const procesarPago       = (data)      => api.post("/pagos/procesar", dat
 export const getPagos           = ()          => api.get("/pagos");
 export const getPagosPorCliente = (clienteId) => api.get(`/pagos/cliente/${clienteId}`);
 export const getPagoPorPedido   = (pedidoId)  => api.get(`/pagos/pedido/${pedidoId}`);
-export const confirmarPago      = (id)        => api.patch(`/pagos/${id}/confirmar`);
-export const reembolsarPago     = (id)        => api.patch(`/pagos/${id}/reembolsar`);
+export const confirmarPago         = (id)           => api.patch(`/pagos/${id}/confirmar`);
+export const solicitarReembolso    = (id, motivo)   => api.patch(`/pagos/${id}/solicitar-reembolso`, { motivo });
+export const reembolsarPago        = (id, motivo)   => api.patch(`/pagos/${id}/reembolsar`, { motivo });

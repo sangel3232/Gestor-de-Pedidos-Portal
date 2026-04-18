@@ -10,6 +10,88 @@ import NavbarUsuario from "../../components/NavbarUsuario";
 
 const METODOS = ["TARJETA_CREDITO", "TARJETA_DEBITO", "TRANSFERENCIA", "EFECTIVO"];
 
+const BANCOS_TRANSFERENCIA = [
+  { id: "NEQUI",       label: "🟣 Nequi",       tipo: "celular",  hint: "Número de celular registrado en Nequi" },
+  { id: "DAVIPLATA",   label: "🔴 Daviplata",    tipo: "celular",  hint: "Número de celular registrado en Daviplata" },
+  { id: "BANCOLOMBIA", label: "🟡 Bancolombia",  tipo: "cuenta",   hint: "Número de cuenta Bancolombia (ahorros/corriente)" },
+  { id: "LLAVEREB",    label: "🔵 Llave (Bre-B)", tipo: "celular", hint: "Número de celular o alias registrado en Bre-B" },
+  { id: "OTRO",        label: "🏦 Otro banco",   tipo: "cuenta",   hint: "Nombre del banco y número de cuenta" },
+];
+
+// Helpers para formato de tarjeta
+const soloNumeros      = (v) => v.replace(/\D/g, "");
+const formatTarjeta    = (v) => soloNumeros(v).slice(0, 16).replace(/(.{4})/g, "$1 ").trim();
+const formatExpiracion = (v) => {
+  const d = soloNumeros(v).slice(0, 4);
+  if (d.length >= 3) return d.slice(0, 2) + "/" + d.slice(2);
+  return d;
+};
+
+// Países y sus departamentos/estados
+const PAISES_DEPARTAMENTOS = {
+  "Colombia": [
+    "Amazonas","Antioquia","Arauca","Atlántico","Bolívar","Boyacá","Caldas",
+    "Caquetá","Casanare","Cauca","Cesar","Chocó","Córdoba","Cundinamarca",
+    "Guainía","Guaviare","Huila","La Guajira","Magdalena","Meta","Nariño",
+    "Norte de Santander","Putumayo","Quindío","Risaralda","San Andrés y Providencia",
+    "Santander","Sucre","Tolima","Valle del Cauca","Vaupés","Vichada",
+  ],
+  "México": [
+    "Aguascalientes","Baja California","Baja California Sur","Campeche","Chiapas",
+    "Chihuahua","Ciudad de México","Coahuila","Colima","Durango","Estado de México",
+    "Guanajuato","Guerrero","Hidalgo","Jalisco","Michoacán","Morelos","Nayarit",
+    "Nuevo León","Oaxaca","Puebla","Querétaro","Quintana Roo","San Luis Potosí",
+    "Sinaloa","Sonora","Tabasco","Tamaulipas","Tlaxcala","Veracruz","Yucatán","Zacatecas",
+  ],
+  "Argentina": [
+    "Buenos Aires","Catamarca","Chaco","Chubut","Córdoba","Corrientes","Entre Ríos",
+    "Formosa","Jujuy","La Pampa","La Rioja","Mendoza","Misiones","Neuquén",
+    "Río Negro","Salta","San Juan","San Luis","Santa Cruz","Santa Fe",
+    "Santiago del Estero","Tierra del Fuego","Tucumán",
+  ],
+  "España": [
+    "Andalucía","Aragón","Asturias","Baleares","Canarias","Cantabria",
+    "Castilla-La Mancha","Castilla y León","Cataluña","Ceuta","Comunidad de Madrid",
+    "Comunidad Valenciana","Extremadura","Galicia","La Rioja","Melilla","Murcia",
+    "Navarra","País Vasco",
+  ],
+  "Perú": [
+    "Amazonas","Áncash","Apurímac","Arequipa","Ayacucho","Cajamarca","Callao",
+    "Cusco","Huancavelica","Huánuco","Ica","Junín","La Libertad","Lambayeque",
+    "Lima","Loreto","Madre de Dios","Moquegua","Pasco","Piura","Puno",
+    "San Martín","Tacna","Tumbes","Ucayali",
+  ],
+  "Chile": [
+    "Arica y Parinacota","Tarapacá","Antofagasta","Atacama","Coquimbo",
+    "Valparaíso","Metropolitana de Santiago","O'Higgins","Maule","Ñuble",
+    "Biobío","La Araucanía","Los Ríos","Los Lagos","Aysén","Magallanes",
+  ],
+  "Ecuador": [
+    "Azuay","Bolívar","Cañar","Carchi","Chimborazo","Cotopaxi","El Oro",
+    "Esmeraldas","Galápagos","Guayas","Imbabura","Loja","Los Ríos","Manabí",
+    "Morona Santiago","Napo","Orellana","Pastaza","Pichincha","Santa Elena",
+    "Santo Domingo","Sucumbíos","Tungurahua","Zamora Chinchipe",
+  ],
+  "Venezuela": [
+    "Amazonas","Anzoátegui","Apure","Aragua","Barinas","Bolívar","Carabobo",
+    "Cojedes","Delta Amacuro","Distrito Capital","Falcón","Guárico","Lara",
+    "Mérida","Miranda","Monagas","Nueva Esparta","Portuguesa","Sucre",
+    "Táchira","Trujillo","Vargas","Yaracuy","Zulia",
+  ],
+  "Estados Unidos": [
+    "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut",
+    "Delaware","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa",
+    "Kansas","Kentucky","Louisiana","Maine","Maryland","Massachusetts","Michigan",
+    "Minnesota","Mississippi","Missouri","Montana","Nebraska","Nevada",
+    "New Hampshire","New Jersey","New Mexico","New York","North Carolina",
+    "North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania","Rhode Island",
+    "South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont",
+    "Virginia","Washington","West Virginia","Wisconsin","Wyoming",
+  ],
+};
+
+const PAISES = Object.keys(PAISES_DEPARTAMENTOS);
+
 export default function Tienda() {
   const { session } = useAuth();
   const clienteId = session?.clienteId;
@@ -20,8 +102,10 @@ export default function Tienda() {
   const [vistaCarrito, setVistaCarrito] = useState(false);
   const [showPago, setShowPago] = useState(false);
   const [metodoPago, setMetodoPago] = useState("TARJETA_CREDITO");
-  const [destino, setDestino] = useState("");
   const [tarjeta, setTarjeta] = useState({ numero: "", titular: "", expiracion: "", cvv: "" });
+  const [banco, setBanco] = useState("");
+  const [datosBanco, setDatosBanco] = useState({ cuenta: "", titular: "" });
+  const [envio, setEnvio] = useState({ pais: "", departamento: "", direccion: "" });
   const [msg, setMsg] = useState({ text: "", ok: true });
   const [procesando, setProcesando] = useState(false);
 
@@ -64,19 +148,42 @@ export default function Tienda() {
 
   const handleCheckout = async () => {
     if (!carrito?.items?.length) { notify("El carrito está vacío", false); return; }
-    if (!destino.trim()) { notify("Debes ingresar la ciudad destino", false); return; }
+    if (!envio.pais)        { notify("Selecciona el país de destino", false); return; }
+    if (!envio.departamento){ notify("Selecciona el departamento/estado", false); return; }
+    if (!envio.direccion.trim()) { notify("Ingresa la dirección de entrega", false); return; }
+    if (metodoPago === "TRANSFERENCIA" && !banco) {
+      notify("Selecciona el banco para la transferencia", false); return;
+    }
+    if (metodoPago === "TRANSFERENCIA" && !datosBanco.cuenta.trim()) {
+      notify("Ingresa el número de cuenta o celular del banco", false); return;
+    }
+    if (metodoPago === "TRANSFERENCIA" && !datosBanco.titular.trim()) {
+      notify("Ingresa el nombre del titular de la cuenta", false); return;
+    }
+
     setProcesando(true);
     try {
       const descripcion = carrito.items.map((i) => `${i.cantidad}x ${i.productoNombre}`).join(", ");
-      const pedidoRes = await crearPedido({ descripcion, total: carrito.total, clienteId, ciudadDestino: destino.trim() });
+      const ciudadDestino = `${envio.departamento}, ${envio.pais}`;
+
+      const pedidoRes = await crearPedido({
+        descripcion,
+        total: carrito.total,
+        clienteId,
+        ciudadDestino,
+        direccionEntrega: envio.direccion.trim(),
+      });
       const pedidoId = pedidoRes.data.id;
       await cambiarEstadoPedido(pedidoId, "CONFIRMADO");
 
       const pagoData = {
-        pedidoId, metodoPago,
+        pedidoId,
+        metodoPago,
         ...(metodoPago !== "TRANSFERENCIA" && metodoPago !== "EFECTIVO" && {
-          numeroTarjeta: tarjeta.numero, titularTarjeta: tarjeta.titular,
-          fechaExpiracion: tarjeta.expiracion, cvv: tarjeta.cvv,
+          numeroTarjeta: tarjeta.numero,
+          titularTarjeta: tarjeta.titular,
+          fechaExpiracion: tarjeta.expiracion,
+          cvv: tarjeta.cvv,
         }),
       };
       const pagoRes = await procesarPago(pagoData);
@@ -85,7 +192,9 @@ export default function Tienda() {
         notify(`✅ ¡Pago exitoso! Ref: ${pagoRes.data.referenciaExterna}`);
         setShowPago(false);
         setVistaCarrito(false);
-        setDestino("");
+        setEnvio({ pais: "", departamento: "", direccion: "" });
+        setBanco("");
+        setDatosBanco({ cuenta: "", titular: "" });
         await vaciarCarrito(clienteId);
         cargarCarrito();
       } else {
@@ -102,6 +211,7 @@ export default function Tienda() {
   const productosFiltrados = productos.filter((p) =>
     p.nombre.toLowerCase().includes(busqueda.toLowerCase())
   );
+  const departamentos = envio.pais ? PAISES_DEPARTAMENTOS[envio.pais] || [] : [];
 
   return (
     <div style={s.page}>
@@ -115,7 +225,6 @@ export default function Tienda() {
           </motion.div>
         )}
 
-        {/* Header tienda */}
         <div style={s.header}>
           <div>
             <h2 style={s.title}>Tienda</h2>
@@ -132,7 +241,6 @@ export default function Tienda() {
           <div style={{ flex: 1 }}>
             <input placeholder="🔍 Buscar productos..." value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)} style={s.search} />
-
             <div style={s.grid}>
               {productosFiltrados.map((p) => (
                 <motion.div key={p.id} style={s.productoCard}
@@ -146,15 +254,12 @@ export default function Tienda() {
                       {p.stock > 0 ? `Stock: ${p.stock}` : "Agotado"}
                     </span>
                   </div>
-                  <button onClick={() => handleAgregar(p.id)} style={s.addBtn}
-                    disabled={p.stock === 0}>
+                  <button onClick={() => handleAgregar(p.id)} style={s.addBtn} disabled={p.stock === 0}>
                     {p.stock === 0 ? "Sin stock" : "Agregar al carrito"}
                   </button>
                 </motion.div>
               ))}
-              {productosFiltrados.length === 0 && (
-                <p style={s.empty}>No se encontraron productos.</p>
-              )}
+              {productosFiltrados.length === 0 && <p style={s.empty}>No se encontraron productos.</p>}
             </div>
           </div>
 
@@ -200,30 +305,88 @@ export default function Tienda() {
                         Proceder al pago →
                       </button>
                     ) : (
-                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                        <p style={s.pagoLabel}>Método de pago</p>
-                        <select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)} style={s.select}>
-                          {METODOS.map((m) => <option key={m} value={m}>{m.replace(/_/g, " ")}</option>)}
+                      <motion.div style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+
+                        {/* ── Datos de envío ── */}
+                        <p style={s.seccionLabel}>📦 Datos de envío</p>
+
+                        <select
+                          value={envio.pais}
+                          onChange={(e) => setEnvio({ pais: e.target.value, departamento: "", direccion: envio.direccion })}
+                          style={s.select}>
+                          <option value="">Selecciona el país</option>
+                          {PAISES.map((p) => <option key={p} value={p}>{p}</option>)}
+                        </select>
+
+                        <select
+                          value={envio.departamento}
+                          onChange={(e) => setEnvio({ ...envio, departamento: e.target.value })}
+                          style={s.select}
+                          disabled={!envio.pais}>
+                          <option value="">
+                            {envio.pais ? "Selecciona el departamento / estado" : "Primero selecciona un país"}
+                          </option>
+                          {departamentos.map((d) => <option key={d} value={d}>{d}</option>)}
                         </select>
 
                         <input
-                          placeholder="Ciudad destino"
+                          placeholder="Dirección de entrega (calle, número, barrio...)"
                           style={s.input}
-                          value={destino}
-                          onChange={(e) => setDestino(e.target.value)}
+                          value={envio.direccion}
+                          onChange={(e) => setEnvio({ ...envio, direccion: e.target.value })}
                         />
 
+                        {/* ── Método de pago ── */}
+                        <p style={{ ...s.seccionLabel, marginTop: 4 }}>💳 Método de pago</p>
+
+                        <select value={metodoPago} onChange={(e) => { setMetodoPago(e.target.value); setBanco(""); setDatosBanco({ cuenta: "", titular: "" }); }} style={s.select}>
+                          {METODOS.map((m) => <option key={m} value={m}>{m.replace(/_/g, " ")}</option>)}
+                        </select>
+
+                        {/* ── Tarjeta ── */}
                         {(metodoPago === "TARJETA_CREDITO" || metodoPago === "TARJETA_DEBITO") && (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
-                            <input placeholder="Número de tarjeta" style={s.input}
-                              value={tarjeta.numero} onChange={(e) => setTarjeta({ ...tarjeta, numero: e.target.value })} />
-                            <input placeholder="Titular" style={s.input}
-                              value={tarjeta.titular} onChange={(e) => setTarjeta({ ...tarjeta, titular: e.target.value })} />
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            <div style={{ position: "relative" }}>
+                              <input
+                                placeholder="Número de tarjeta"
+                                style={s.input}
+                                inputMode="numeric"
+                                value={tarjeta.numero}
+                                maxLength={19}
+                                onChange={(e) => setTarjeta({ ...tarjeta, numero: formatTarjeta(e.target.value) })}
+                              />
+                              {tarjeta.numero.replace(/\s/g, "").length > 0 && (
+                                <span style={s.inputHint}>
+                                  {tarjeta.numero.replace(/\s/g, "").length}/16
+                                </span>
+                              )}
+                            </div>
+                            <input
+                              placeholder="Titular (como aparece en la tarjeta)"
+                              style={s.input}
+                              value={tarjeta.titular}
+                              onChange={(e) => setTarjeta({ ...tarjeta, titular: e.target.value.toUpperCase() })}
+                            />
                             <div style={{ display: "flex", gap: 8 }}>
-                              <input placeholder="MM/AA" style={{ ...s.input, flex: 1 }}
-                                value={tarjeta.expiracion} onChange={(e) => setTarjeta({ ...tarjeta, expiracion: e.target.value })} />
-                              <input placeholder="CVV" style={{ ...s.input, flex: 1 }}
-                                value={tarjeta.cvv} onChange={(e) => setTarjeta({ ...tarjeta, cvv: e.target.value })} />
+                              <div style={{ flex: 1, position: "relative" }}>
+                                <input
+                                  placeholder="MM/AA"
+                                  style={s.input}
+                                  inputMode="numeric"
+                                  value={tarjeta.expiracion}
+                                  maxLength={5}
+                                  onChange={(e) => setTarjeta({ ...tarjeta, expiracion: formatExpiracion(e.target.value) })}
+                                />
+                              </div>
+                              <input
+                                placeholder="CVV"
+                                style={{ ...s.input, flex: 1 }}
+                                inputMode="numeric"
+                                maxLength={4}
+                                value={tarjeta.cvv}
+                                onChange={(e) => setTarjeta({ ...tarjeta, cvv: soloNumeros(e.target.value).slice(0, 4) })}
+                              />
                             </div>
                             <p style={{ fontSize: 11, color: "#64748b", margin: 0 }}>
                               💡 Tarjeta terminada en 0000 simula rechazo
@@ -231,7 +394,77 @@ export default function Tienda() {
                           </div>
                         )}
 
-                        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                        {/* ── Transferencia bancaria ── */}
+                        {metodoPago === "TRANSFERENCIA" && (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                            <p style={{ ...s.seccionLabel, marginTop: 0 }}>Selecciona el banco</p>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                              {BANCOS_TRANSFERENCIA.map((b) => (
+                                <button key={b.id} type="button"
+                                  onClick={() => { setBanco(b.id); setDatosBanco({ cuenta: "", titular: "" }); }}
+                                  style={{
+                                    padding: "8px 14px", borderRadius: 20, fontSize: 13, cursor: "pointer",
+                                    border: banco === b.id ? "1px solid #38bdf8" : "1px solid #334155",
+                                    background: banco === b.id ? "#38bdf822" : "transparent",
+                                    color: banco === b.id ? "#38bdf8" : "#94a3b8",
+                                    fontWeight: banco === b.id ? "bold" : "normal",
+                                  }}>
+                                  {b.label}
+                                </button>
+                              ))}
+                            </div>
+
+                            {banco && (() => {
+                              const bancoInfo = BANCOS_TRANSFERENCIA.find(b => b.id === banco);
+                              return (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                  <p style={{ fontSize: 12, color: "#94a3b8", margin: 0 }}>
+                                    {bancoInfo.hint}
+                                  </p>
+                                  <input
+                                    placeholder={bancoInfo.tipo === "celular" ? "Número de celular" : "Número de cuenta"}
+                                    style={s.input}
+                                    inputMode="numeric"
+                                    value={datosBanco.cuenta}
+                                    onChange={(e) => setDatosBanco({ ...datosBanco, cuenta: soloNumeros(e.target.value) })}
+                                  />
+                                  <input
+                                    placeholder="Nombre completo del titular"
+                                    style={s.input}
+                                    value={datosBanco.titular}
+                                    onChange={(e) => setDatosBanco({ ...datosBanco, titular: e.target.value })}
+                                  />
+                                  {banco === "OTRO" && (
+                                    <input
+                                      placeholder="Nombre del banco"
+                                      style={s.input}
+                                      value={datosBanco.nombreBanco || ""}
+                                      onChange={(e) => setDatosBanco({ ...datosBanco, nombreBanco: e.target.value })}
+                                    />
+                                  )}
+                                  <div style={s.infoBox}>
+                                    <p style={{ margin: 0, fontSize: 12, color: "#fbbf24" }}>
+                                      ⚠️ Al confirmar el pago, enviarás una solicitud de transferencia.
+                                      El administrador verificará el pago y aprobará tu pedido.
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
+
+                        {/* ── Efectivo ── */}
+                        {metodoPago === "EFECTIVO" && (
+                          <div style={s.infoBox}>
+                            <p style={{ margin: 0, fontSize: 12, color: "#fbbf24" }}>
+                              💵 El pago en efectivo debe realizarse en el punto de entrega.
+                              Tu pedido quedará confirmado y el administrador validará el pago.
+                            </p>
+                          </div>
+                        )}
+
+                        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                           <button onClick={handleCheckout} style={s.checkoutBtn} disabled={procesando}>
                             {procesando ? "Procesando..." : `Pagar $${carrito.total?.toFixed(2)}`}
                           </button>
@@ -251,81 +484,86 @@ export default function Tienda() {
 }
 
 const s = {
-  page: { minHeight: "100vh", background: "#f8fafc", color: "#111827" },
+  page:    { minHeight: "100vh", background: "#0f172a", color: "#e2e8f0" },
   content: { padding: "24px 32px", position: "relative" },
-  toast: {
-    padding: "12px 18px", borderRadius: 8, border: "1px solid", marginBottom: 16, fontSize: 14,
-  },
-  header: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
-  title: { color: "#b91c1c", margin: 0 },
-  welcome: { color: "#6b7280", margin: "4px 0 0", fontSize: 14 },
+  toast:   { padding: "12px 18px", borderRadius: 8, border: "1px solid", marginBottom: 16, fontSize: 14 },
+  header:  { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
+  title:   { color: "#4ade80", margin: 0 },
+  welcome: { color: "#64748b", margin: "4px 0 0", fontSize: 14 },
   carritoBtn: {
-    position: "relative", padding: "10px 20px", background: "#fff",
-    color: "#111827", border: "1px solid #e5e7eb", borderRadius: 8,
+    position: "relative", padding: "10px 20px", background: "#1e293b",
+    color: "#e2e8f0", border: "1px solid #334155", borderRadius: 8,
     cursor: "pointer", fontSize: 15, fontWeight: "bold",
   },
   badge: {
-    position: "absolute", top: -6, right: -6, background: "#dc2626",
-    color: "#fff", borderRadius: "50%", width: 20, height: 20,
+    position: "absolute", top: -6, right: -6, background: "#4ade80",
+    color: "#0f172a", borderRadius: "50%", width: 20, height: 20,
     display: "flex", alignItems: "center", justifyContent: "center",
     fontSize: 11, fontWeight: "bold",
   },
-  layout: { display: "flex", gap: 24, alignItems: "flex-start" },
-  search: {
+  layout:  { display: "flex", gap: 24, alignItems: "flex-start" },
+  search:  {
     width: "100%", padding: "10px 16px", borderRadius: 8, marginBottom: 20,
-    border: "1px solid #d1d5db", background: "#fff", color: "#111827",
+    border: "1px solid #334155", background: "#1e293b", color: "#e2e8f0",
     fontSize: 14, outline: "none", boxSizing: "border-box",
   },
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 },
   productoCard: {
-    background: "#fff", borderRadius: 12, padding: "20px 18px",
-    display: "flex", flexDirection: "column", gap: 8,
-    border: "1px solid #e5e7eb", cursor: "default",
+    background: "#1e293b", borderRadius: 12, padding: "20px 18px",
+    display: "flex", flexDirection: "column", gap: 8, border: "1px solid #334155",
   },
-  productoIcon: { fontSize: 32, textAlign: "center" },
-  productoNombre: { margin: 0, fontWeight: "bold", fontSize: 15, color: "#111827" },
-  productoDesc: { margin: 0, fontSize: 12, color: "#6b7280", flexGrow: 1 },
+  productoIcon:   { fontSize: 32, textAlign: "center" },
+  productoNombre: { margin: 0, fontWeight: "bold", fontSize: 15 },
+  productoDesc:   { margin: 0, fontSize: 12, color: "#64748b", flexGrow: 1 },
   productoFooter: { display: "flex", justifyContent: "space-between", alignItems: "center" },
-  productoPrecio: { color: "#111827", fontWeight: "bold", fontSize: 18 },
-  stockBadge: { fontSize: 12 },
+  productoPrecio: { color: "#4ade80", fontWeight: "bold", fontSize: 18 },
+  stockBadge:     { fontSize: 12 },
   addBtn: {
-    padding: "9px", background: "#dc2626", color: "#fff",
+    padding: "9px", background: "#4ade80", color: "#0f172a",
     border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer", fontSize: 14,
   },
   carritoPanel: {
-    width: 340, minWidth: 300, background: "#fff", borderRadius: 12,
+    width: 360, minWidth: 320, background: "#1e293b", borderRadius: 12,
     padding: "20px", position: "sticky", top: 20,
-    border: "1px solid #e5e7eb", flexShrink: 0,
+    border: "1px solid #334155", flexShrink: 0, maxHeight: "90vh", overflowY: "auto",
   },
   carritoPanelHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
-  carritoTitle: { margin: 0, color: "#b91c1c", fontSize: 16 },
-  closeBtn: { background: "transparent", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18 },
-  itemRow: { display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: "1px solid #e5e7eb" },
-  itemNombre: { margin: 0, fontSize: 13, fontWeight: "bold", color: "#111827" },
-  itemPrecio: { margin: "2px 0 0", fontSize: 11, color: "#6b7280" },
-  qtyCtrl: { display: "flex", alignItems: "center", gap: 4 },
-  qtyBtn: { width: 24, height: 24, background: "#f3f4f6", color: "#111827", border: "1px solid #d1d5db", borderRadius: 5, cursor: "pointer" },
-  qty: { minWidth: 20, textAlign: "center", fontSize: 13 },
-  itemSubtotal: { color: "#111827", fontSize: 13, fontWeight: "bold", minWidth: 55, textAlign: "right" },
-  removeBtn: { background: "transparent", color: "#dc2626", border: "none", cursor: "pointer", fontSize: 14 },
-  totalRow: { display: "flex", justifyContent: "space-between", padding: "12px 0", borderTop: "1px solid #e5e7eb", marginTop: 8 },
-  totalValue: { color: "#111827", fontWeight: "bold", fontSize: 20 },
+  carritoTitle: { margin: 0, color: "#4ade80", fontSize: 16 },
+  closeBtn:     { background: "transparent", border: "none", color: "#64748b", cursor: "pointer", fontSize: 18 },
+  itemRow:      { display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: "1px solid #0f172a" },
+  itemNombre:   { margin: 0, fontSize: 13, fontWeight: "bold" },
+  itemPrecio:   { margin: "2px 0 0", fontSize: 11, color: "#64748b" },
+  qtyCtrl:      { display: "flex", alignItems: "center", gap: 4 },
+  qtyBtn:       { width: 24, height: 24, background: "#334155", color: "#e2e8f0", border: "none", borderRadius: 5, cursor: "pointer" },
+  qty:          { minWidth: 20, textAlign: "center", fontSize: 13 },
+  itemSubtotal: { color: "#4ade80", fontSize: 13, fontWeight: "bold", minWidth: 55, textAlign: "right" },
+  removeBtn:    { background: "transparent", color: "#f87171", border: "none", cursor: "pointer", fontSize: 14 },
+  totalRow:     { display: "flex", justifyContent: "space-between", padding: "12px 0", borderTop: "1px solid #334155", marginTop: 8 },
+  totalValue:   { color: "#4ade80", fontWeight: "bold", fontSize: 20 },
   checkoutBtn: {
-    width: "100%", padding: "11px", background: "#dc2626", color: "#fff",
-    border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer", fontSize: 15,
+    flex: 1, padding: "11px", background: "#4ade80", color: "#0f172a",
+    border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer", fontSize: 14,
   },
   cancelBtn: {
-    flex: 1, padding: "11px", background: "#f3f4f6", color: "#111827",
-    border: "1px solid #d1d5db", borderRadius: 8, cursor: "pointer",
+    padding: "11px 14px", background: "#334155", color: "#e2e8f0",
+    border: "none", borderRadius: 8, cursor: "pointer",
   },
-  pagoLabel: { fontSize: 13, color: "#6b7280", margin: "12px 0 6px" },
+  seccionLabel: { fontSize: 13, color: "#94a3b8", margin: "4px 0 2px", fontWeight: "bold" },
   select: {
-    width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid #d1d5db",
-    background: "#fff", color: "#111827", fontSize: 14, outline: "none",
+    width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid #334155",
+    background: "#0f172a", color: "#e2e8f0", fontSize: 13, outline: "none",
   },
   input: {
-    width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid #d1d5db",
-    background: "#fff", color: "#111827", fontSize: 13, outline: "none", boxSizing: "border-box",
+    width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid #334155",
+    background: "#0f172a", color: "#e2e8f0", fontSize: 13, outline: "none", boxSizing: "border-box",
   },
-  empty: { color: "#6b7280", fontSize: 14, padding: "12px 0" },
+  inputHint: {
+    position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+    fontSize: 11, color: "#64748b", pointerEvents: "none",
+  },
+  infoBox: {
+    padding: "10px 12px", borderRadius: 8,
+    background: "#0f172a", border: "1px solid #fbbf2433",
+  },
+  empty: { color: "#64748b", fontSize: 14, padding: "12px 0" },
 };

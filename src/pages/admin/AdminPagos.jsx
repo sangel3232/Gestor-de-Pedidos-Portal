@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getPagos, getClientes, getPagosPorCliente, confirmarPago, reembolsarPago } from "../../api";
 import NavbarAdmin from "../../components/NavbarAdmin";
 
-const COLORES = { COMPLETADO: "#4ade80", PENDIENTE: "#fbbf24", FALLIDO: "#f87171", REEMBOLSADO: "#a78bfa" };
+const COLORES = { COMPLETADO: "#4ade80", PENDIENTE: "#fbbf24", FALLIDO: "#f87171", REEMBOLSADO: "#a78bfa", SOLICITADO_REEMBOLSO: "#f59e0b" };
 
 export default function AdminPagos() {
   const [pagos, setPagos] = useState([]);
@@ -44,7 +44,7 @@ export default function AdminPagos() {
   const handleReembolsarConfirmado = async () => {
     if (!modalPago) return;
     try {
-      await reembolsarPago(modalPago.id);
+      await reembolsarPago(modalPago.id, modalPago.motivoReembolso || "Reembolso administrativo");
       notify("✅ Reembolso procesado correctamente. El cliente recibirá el dinero en breve.");
       setModalPago(null);
       cargarPagos(filtroCliente);
@@ -73,11 +73,12 @@ export default function AdminPagos() {
         {/* Stats */}
         <div style={s.stats}>
           {[
-            { label: "Total",       value: pagos.length,                                              color: "#38bdf8" },
-            { label: "Completados", value: pagos.filter(p => p.estado === "COMPLETADO").length,       color: "#4ade80" },
-            { label: "Reembolsados",value: pagos.filter(p => p.estado === "REEMBOLSADO").length,      color: "#a78bfa" },
-            { label: "Fallidos",    value: pagos.filter(p => p.estado === "FALLIDO").length,          color: "#f87171" },
-            { label: "Facturado",   value: `$${totalCobrado.toFixed(2)}`,                             color: "#4ade80" },
+            { label: "Total",        value: pagos.length,                                                    color: "#38bdf8" },
+            { label: "Completados",  value: pagos.filter(p => p.estado === "COMPLETADO").length,            color: "#4ade80" },
+            { label: "Solicitudes",  value: pagos.filter(p => p.estado === "SOLICITADO_REEMBOLSO").length,  color: "#f59e0b" },
+            { label: "Reembolsados", value: pagos.filter(p => p.estado === "REEMBOLSADO").length,           color: "#a78bfa" },
+            { label: "Fallidos",     value: pagos.filter(p => p.estado === "FALLIDO").length,               color: "#f87171" },
+            { label: "Facturado",    value: `$${totalCobrado.toFixed(2)}`,                                  color: "#4ade80" },
           ].map(({ label, value, color }) => (
             <motion.div key={label} style={{ ...s.statCard, borderTop: `3px solid ${color}` }}
               initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
@@ -125,9 +126,10 @@ export default function AdminPagos() {
                     ✓ Confirmar
                   </button>
                 )}
-                {p.estado === "COMPLETADO" && (p.pedidoEstado === "PAGADO" || p.pedidoEstado === "CONFIRMADO") && (
-                  <button onClick={() => setModalPago(p)} style={s.refundBtn}>
-                    ↩ Reembolsar
+                {(p.estado === "COMPLETADO" || p.estado === "SOLICITADO_REEMBOLSO") &&
+                 (p.pedidoEstado === "PAGADO" || p.pedidoEstado === "CONFIRMADO") && (
+                  <button onClick={() => setModalPago(p)} style={p.estado === "SOLICITADO_REEMBOLSO" ? s.refundBtnAlert : s.refundBtn}>
+                    {p.estado === "SOLICITADO_REEMBOLSO" ? "🔔 Aprobar reembolso" : "↩ Reembolsar"}
                   </button>
                 )}
               </span>
@@ -196,8 +198,9 @@ const s = {
   row:    { display: "grid", gridTemplateColumns: "50px 70px 1fr 100px 100px 130px 110px 160px 140px 160px", padding: "10px 16px", borderTop: "1px solid #0f172a", fontSize: 13, alignItems: "center" },
   hint:   { padding: 16, color: "#64748b", fontSize: 14 },
   actions:    { display: "flex", gap: 6, flexWrap: "wrap" },
-  confirmBtn: { padding: "4px 10px", fontSize: 11, borderRadius: 6, border: "none", background: "#4ade80", color: "#0f172a", cursor: "pointer", fontWeight: "bold" },
-  refundBtn:  { padding: "4px 10px", fontSize: 11, borderRadius: 6, border: "1px solid #a78bfa", background: "transparent", color: "#a78bfa", cursor: "pointer", fontWeight: "bold" },
+  confirmBtn:    { padding: "4px 10px", fontSize: 11, borderRadius: 6, border: "none", background: "#4ade80", color: "#0f172a", cursor: "pointer", fontWeight: "bold" },
+  refundBtn:     { padding: "4px 10px", fontSize: 11, borderRadius: 6, border: "1px solid #a78bfa", background: "transparent", color: "#a78bfa", cursor: "pointer", fontWeight: "bold" },
+  refundBtnAlert:{ padding: "4px 10px", fontSize: 11, borderRadius: 6, border: "1px solid #f59e0b", background: "#f59e0b22", color: "#f59e0b", cursor: "pointer", fontWeight: "bold" },
   // Modal
   overlay: {
     position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)",
