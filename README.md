@@ -72,3 +72,14 @@ El resultado se genera en la carpeta `dist`.
 ## Contribuciones
 
 Si deseas mejorar este portal, abre un issue o un pull request con tus cambios.
+
+### Endpoints implementados
+
+# Repositorio Principal 
+## Repositorio 
+## Repositorio Portal : [ir](https://github.com/sangel3232/Gestor-de-Pedidos-Portal) 
+## Repositorio Api : [ir](https://github.com/sangel3232/Gestor-de-Pedidos-Api) 
+## Repositorio DB : [ir](https://github.com/sangel3232/Gestor-de-Pedidos-DB)
+
+## Issues/Notion : https://www.notion.so/903ee3f7a312830c8fe081f1669e485b?v=a37ee3f7a3128363bba208761ca0ae40
+
