@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { getPedidos, getClientes, getPagos } from "../../api";
+import { getPedidos, getClientes, getPagos, descargarReporteVentas, descargarReporteProductos } from "../../api";
 import NavbarAdmin from "../../components/NavbarAdmin";
 
 const ESTADOS = ["CREADO", "CONFIRMADO", "PAGADO", "CANCELADO"];
@@ -10,12 +10,34 @@ export default function AdminDashboard() {
   const [pedidos, setPedidos] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [pagos, setPagos] = useState([]);
+  const [descargando, setDescargando] = useState("");
 
   useEffect(() => {
     getPedidos().then((r) => setPedidos(r.data.content || r.data));
     getClientes().then((r) => setClientes(r.data.content || r.data));
     getPagos().then((r) => setPagos(r.data));
   }, []);
+
+  const descargarPDF = async (tipo) => {
+    setDescargando(tipo);
+    try {
+      const hoy   = new Date().toISOString().split("T")[0];
+      const inicio = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
+      const res = tipo === "ventas"
+        ? await descargarReporteVentas(inicio, hoy)
+        : await descargarReporteProductos();
+      const url  = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href  = url;
+      link.download = tipo === "ventas" ? `reporte-ventas-${hoy}.pdf` : `reporte-inventario-${hoy}.pdf`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      alert("Error al generar el reporte PDF");
+    } finally {
+      setDescargando("");
+    }
+  };
 
   const totalPagado = pagos
     .filter((p) => p.estado === "COMPLETADO")
@@ -26,6 +48,18 @@ export default function AdminDashboard() {
       <NavbarAdmin />
       <div style={s.content}>
         <h2 style={s.title}>Dashboard</h2>
+
+        {/* Botones de reportes */}
+        <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
+          <button onClick={() => descargarPDF("ventas")} disabled={descargando === "ventas"}
+            style={s.reportBtn}>
+            {descargando === "ventas" ? "⏳ Generando..." : "📄 Reporte de Ventas (PDF)"}
+          </button>
+          <button onClick={() => descargarPDF("productos")} disabled={descargando === "productos"}
+            style={{ ...s.reportBtn, background: "#a78bfa22", borderColor: "#a78bfa", color: "#a78bfa" }}>
+            {descargando === "productos" ? "⏳ Generando..." : "📦 Reporte de Inventario (PDF)"}
+          </button>
+        </div>
 
         <div style={s.grid}>
           <Card label="Total Pedidos" value={pedidos.length} color="#38bdf8" />
@@ -71,10 +105,14 @@ function Card({ label, value, color }) {
 }
 
 const s = {
-  page: { minHeight: "100vh", background: "#f8fafc", color: "#111827" },
+  page: { minHeight: "100vh", background: "#0f172a", color: "#e2e8f0" },
   content: { padding: "28px 32px" },
-  title: { color: "#b91c1c", marginBottom: 20 },
-  subtitle: { color: "#6b7280", margin: "28px 0 12px" },
+  title: { color: "#38bdf8", marginBottom: 20 },
+  subtitle: { color: "#94a3b8", margin: "28px 0 12px" },
+  reportBtn: {
+    padding: "9px 18px", background: "#38bdf822", border: "1px solid #38bdf8",
+    color: "#38bdf8", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: "bold",
+  },
   grid: { display: "flex", flexWrap: "wrap", gap: 16 },
   card: { background: "#fff", borderRadius: 10, padding: "18px 24px", minWidth: 150, flex: "1 1 140px", border: "1px solid #e5e7eb" },
   cardLabel: { margin: 0, fontSize: 13, color: "#6b7280" },

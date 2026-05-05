@@ -12,12 +12,12 @@ export const crearCliente    = (data) => api.post("/clientes", data);
 export const getClientePorId = (id)   => api.get(`/clientes/${id}`);
 
 // ── Pedidos ───────────────────────────────────────────
-export const getPedidos           = ()               => api.get("/pedidos");
-export const getPedidosPorEstado  = (estado)         => api.get(`/pedidos/estado/${estado}`);
-export const getPedidosPorCliente = (id)             => api.get(`/pedidos/cliente/${id}`);
-export const crearPedido          = (data)           => api.post("/pedidos", data);
-export const eliminarPedido       = (id)             => api.delete(`/pedidos/${id}`);
-export const cambiarEstadoPedido  = (id, estado)     => api.patch(`/pedidos/${id}/estado`, { estado });
+export const getPedidos           = ()           => api.get("/pedidos");
+export const getPedidosPorEstado  = (estado)     => api.get(`/pedidos/estado/${estado}`);
+export const getPedidosPorCliente = (id)         => api.get(`/pedidos/cliente/${id}`);
+export const crearPedido          = (data)       => api.post("/pedidos", data);
+export const eliminarPedido       = (id)         => api.delete(`/pedidos/${id}`);
+export const cambiarEstadoPedido  = (id, estado) => api.patch(`/pedidos/${id}/estado`, { estado });
 
 // ── Productos ─────────────────────────────────────────
 export const getProductos       = ()         => api.get("/productos");
@@ -26,17 +26,24 @@ export const actualizarProducto = (id, data) => api.put(`/productos/${id}`, data
 export const eliminarProducto   = (id)       => api.delete(`/productos/${id}`);
 
 // ── Carrito ───────────────────────────────────────────
-export const getCarrito            = (clienteId)            => api.get(`/carrito/cliente/${clienteId}`);
-export const agregarItemCarrito    = (clienteId, data)      => api.post(`/carrito/cliente/${clienteId}/items`, data);
+export const getCarrito            = (clienteId)                   => api.get(`/carrito/cliente/${clienteId}`);
+export const agregarItemCarrito    = (clienteId, data)             => api.post(`/carrito/cliente/${clienteId}/items`, data);
 export const actualizarItemCarrito = (clienteId, itemId, cantidad) => api.patch(`/carrito/cliente/${clienteId}/items/${itemId}`, { cantidad });
-export const eliminarItemCarrito   = (clienteId, itemId)    => api.delete(`/carrito/cliente/${clienteId}/items/${itemId}`);
-export const vaciarCarrito         = (clienteId)            => api.delete(`/carrito/cliente/${clienteId}/vaciar`);
+export const eliminarItemCarrito   = (clienteId, itemId)           => api.delete(`/carrito/cliente/${clienteId}/items/${itemId}`);
+export const vaciarCarrito         = (clienteId)                   => api.delete(`/carrito/cliente/${clienteId}/vaciar`);
+export const iniciarCheckout       = (clienteId)                   => api.post(`/carrito/cliente/${clienteId}/checkout`);
 
 // ── Pagos ─────────────────────────────────────────────
 export const procesarPago       = (data)      => api.post("/pagos/procesar", data);
 export const getPagos           = ()          => api.get("/pagos");
 export const getPagosPorCliente = (clienteId) => api.get(`/pagos/cliente/${clienteId}`);
 export const getPagoPorPedido   = (pedidoId)  => api.get(`/pagos/pedido/${pedidoId}`);
-export const confirmarPago         = (id)           => api.patch(`/pagos/${id}/confirmar`);
-export const solicitarReembolso    = (id, motivo)   => api.patch(`/pagos/${id}/solicitar-reembolso`, { motivo });
-export const reembolsarPago        = (id, motivo)   => api.patch(`/pagos/${id}/reembolsar`, { motivo });
+export const confirmarPago      = (id)        => api.patch(`/pagos/${id}/confirmar`);
+export const solicitarReembolso = (id, motivo)=> api.patch(`/pagos/${id}/solicitar-reembolso`, { motivo });
+export const reembolsarPago     = (id, motivo)=> api.patch(`/pagos/${id}/reembolsar`, { motivo });
+
+// ── Reportes ──────────────────────────────────────────
+export const descargarReporteVentas    = (desde, hasta) =>
+  api.get(`/reportes/ventas?desde=${desde}&hasta=${hasta}`, { responseType: "blob" });
+export const descargarReporteProductos = () =>
+  api.get("/reportes/productos", { responseType: "blob" });

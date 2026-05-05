@@ -1,60 +1,98 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "../../context/AuthContext";
-import { getPedidosPorCliente, cambiarEstadoPedido } from "../../api";
+import { getPedidosPorCliente } from "../../api";
 import NavbarUsuario from "../../components/NavbarUsuario";
 
-const COLORES = { CREADO: "#38bdf8", CONFIRMADO: "#a78bfa", PAGADO: "#4ade80", CANCELADO: "#f87171" };
+// Pasos del tracking en orden
+const PASOS = [
+  { estado: "CREADO",     label: "Pedido creado",    icono: "📋" },
+  { estado: "CONFIRMADO", label: "Confirmado",        icono: "✅" },
+  { estado: "PAGADO",     label: "Pago recibido",     icono: "💳" },
+  { estado: "EN_CAMINO",  label: "En camino",         icono: "🚚" },
+  { estado: "ENTREGADO",  label: "Entregado",         icono: "📦" },
+];
+
+const COLORES = {
+  CREADO: "#38bdf8", CONFIRMADO: "#a78bfa", PAGADO: "#4ade80",
+  EN_CAMINO: "#fb923c", ENTREGADO: "#22c55e",
+  CANCELADO: "#f87171", REEMBOLSADO: "#c084fc",
+};
+
+function indicePaso(estado) {
+  return PASOS.findIndex(p => p.estado === estado);
+}
+
+function TrackingTimeline({ estado }) {
+  const idx = indicePaso(estado);
+  const cancelado   = estado === "CANCELADO";
+  const reembolsado = estado === "REEMBOLSADO";
+
+  if (cancelado || reembolsado) {
+    return (
+      <div style={tl.container}>
+        <div style={{ ...tl.badge, background: COLORES[estado] + "22", color: COLORES[estado] }}>
+          {cancelado ? "❌ Pedido cancelado" : "↩️ Pedido reembolsado"}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={tl.container}>
+      {PASOS.map((paso, i) => {
+        const completado = i <= idx;
+        const activo     = i === idx;
+        return (
+          <div key={paso.estado} style={tl.paso}>
+            {/* Línea conectora */}
+            {i > 0 && (
+              <div style={{ ...tl.linea, background: i <= idx ? COLORES[PASOS[idx].estado] : "#334155" }} />
+            )}
+            {/* Círculo */}
+            <motion.div
+              style={{
+                ...tl.circulo,
+                background: completado ? COLORES[PASOS[idx].estado] : "#1e293b",
+                border: `2px solid ${completado ? COLORES[PASOS[idx].estado] : "#334155"}`,
+                boxShadow: activo ? `0 0 12px ${COLORES[paso.estado]}88` : "none",
+              }}
+              animate={activo ? { scale: [1, 1.15, 1] } : {}}
+              transition={{ repeat: Infinity, duration: 1.8 }}>
+              <span style={{ fontSize: activo ? 16 : 13 }}>{paso.icono}</span>
+            </motion.div>
+            {/* Label */}
+            <p style={{ ...tl.label, color: completado ? "#e2e8f0" : "#475569", fontWeight: activo ? "bold" : "normal" }}>
+              {paso.label}
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const tl = {
+  container: { display: "flex", alignItems: "flex-start", gap: 0, marginTop: 16, marginBottom: 4, position: "relative" },
+  paso:      { display: "flex", flexDirection: "column", alignItems: "center", flex: 1, position: "relative" },
+  linea:     { position: "absolute", top: 18, right: "50%", width: "100%", height: 2, zIndex: 0 },
+  circulo:   { width: 36, height: 36, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1, position: "relative" },
+  label:     { fontSize: 10, textAlign: "center", marginTop: 6, lineHeight: 1.3 },
+  badge:     { padding: "6px 14px", borderRadius: 20, fontSize: 13, fontWeight: "bold" },
+};
 
 export default function MisPedidos() {
   const { session } = useAuth();
   const [pedidos, setPedidos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [msg, setMsg] = useState({ text: "", ok: true });
-  const [cancelModal, setCancelModal] = useState({ open: false, pedido: null, observacion: "" });
 
-  const cargarPedidos = () => {
+  useEffect(() => {
     if (!session?.clienteId) return;
-    setLoading(true);
     getPedidosPorCliente(session.clienteId)
       .then((r) => setPedidos(Array.isArray(r.data) ? r.data : []))
       .catch(() => setPedidos([]))
       .finally(() => setLoading(false));
-  };
-
-  const notify = (text, ok = true) => {
-    setMsg({ text, ok });
-    setTimeout(() => setMsg({ text: "", ok: true }), 4000);
-  };
-
-  useEffect(() => {
-    cargarPedidos();
   }, [session]);
-
-  const handleCancelar = (pedido) => {
-    setCancelModal({ open: true, pedido, observacion: "" });
-  };
-
-  const cerrarModalCancelacion = () => {
-    setCancelModal({ open: false, pedido: null, observacion: "" });
-  };
-
-  const enviarCancelacion = async () => {
-    const { pedido, observacion } = cancelModal;
-    if (!pedido) return;
-    if (!observacion.trim()) {
-      window.alert("Escribe una observación para cancelar el pedido.");
-      return;
-    }
-    try {
-      await cambiarEstadoPedido(pedido.id, "CANCELADO", observacion.trim());
-      notify(`✅ Pedido #${pedido.id} cancelado`);
-      cerrarModalCancelacion();
-      cargarPedidos();
-    } catch (err) {
-      notify("❌ " + (err.response?.data?.mensaje || "No se pudo cancelar"), false);
-    }
-  };
 
   return (
     <div style={s.page}>
@@ -62,27 +100,8 @@ export default function MisPedidos() {
       <div style={s.content}>
         <h2 style={s.title}>Mis Pedidos</h2>
 
-        {msg.text && <p style={{ color: msg.ok ? "#4ade80" : "#f87171", marginBottom: 12, fontSize: 14 }}>{msg.text}</p>}
-        {cancelModal.open && (
-          <div style={s.modalBackdrop}>
-            <div style={s.modal}>
-              <h3 style={s.modalTitle}>Cancelar pedido</h3>
-              <p style={s.modalText}>Escribe el motivo de cancelación para el pedido #{cancelModal.pedido?.id}.</p>
-              <textarea
-                value={cancelModal.observacion}
-                onChange={(e) => setCancelModal((prev) => ({ ...prev, observacion: e.target.value }))}
-                style={s.modalTextarea}
-                placeholder="Motivo de cancelación"
-                rows={4}
-              />
-              <div style={s.modalActions}>
-                <button onClick={cerrarModalCancelacion} style={s.modalCancelBtn}>Cancelar</button>
-                <button onClick={enviarCancelacion} style={s.modalSubmitBtn}>Confirmar cancelación</button>
-              </div>
-            </div>
-          </div>
-        )}
         {loading && <p style={s.hint}>Cargando...</p>}
+
         {!loading && pedidos.length === 0 && (
           <div style={s.empty}>
             <p style={{ fontSize: 48 }}>📦</p>
@@ -94,25 +113,36 @@ export default function MisPedidos() {
           {pedidos.map((p) => (
             <motion.div key={p.id} style={s.card}
               initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
+
               <div style={s.cardHeader}>
                 <span style={s.pedidoId}>Pedido #{p.id}</span>
-                <span style={{ ...s.estadoBadge, background: COLORES[p.estado] + "22", color: COLORES[p.estado] }}>
+                <span style={{ ...s.estadoBadge, background: (COLORES[p.estado] || "#334155") + "22", color: COLORES[p.estado] || "#94a3b8" }}>
                   {p.estado}
                 </span>
               </div>
+
               <p style={s.descripcion}>{p.descripcion}</p>
-              <p style={s.meta}>Cliente: {p.cliente?.nombre || "-"} · Ciudad: {p.cliente?.ciudad || "-"}</p>
-              <p style={s.meta}>Destino: {p.ciudadDestino || "-"}</p>
-              {p.observacionCancelacion && (
-                <p style={s.obs}>Motivo cancelación: {p.observacionCancelacion}</p>
+
+              {p.ciudadDestino && (
+                <p style={s.meta}>📍 {p.ciudadDestino}</p>
               )}
+              {p.direccionEntrega && (
+                <p style={s.meta}>🏠 {p.direccionEntrega}</p>
+              )}
+
+              {/* Línea de tiempo de seguimiento */}
+              <TrackingTimeline estado={p.estado} />
+
+              {p.observacionCancelacion && (
+                <p style={s.obs}>💬 {p.observacionCancelacion}</p>
+              )}
+
               <div style={s.cardFooter}>
                 <span style={s.total}>${p.total?.toFixed(2)}</span>
-                <span style={s.fecha}>{p.fecha ? new Date(p.fecha).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</span>
+                <span style={s.fecha}>
+                  {p.fecha ? new Date(p.fecha).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+                </span>
               </div>
-              {(p.estado === "CREADO" || p.estado === "CONFIRMADO") && (
-                <button onClick={() => handleCancelar(p)} style={s.cancelBtn}>Cancelar pedido</button>
-              )}
             </motion.div>
           ))}
         </div>
@@ -122,36 +152,20 @@ export default function MisPedidos() {
 }
 
 const s = {
-  page: { minHeight: "100vh", background: "#f8fafc", color: "#111827" },
-  content: { padding: "28px 32px" },
-  title: { color: "#b91c1c", marginBottom: 24 },
-  hint: { color: "#6b7280" },
-  empty: { textAlign: "center", color: "#6b7280", padding: "60px 0" },
-  list: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 },
-  card: { background: "#fff", borderRadius: 12, padding: "18px 20px", border: "1px solid #e5e7eb" },
+  page:       { minHeight: "100vh", background: "#0f172a", color: "#e2e8f0" },
+  content:    { padding: "28px 32px" },
+  title:      { color: "#4ade80", marginBottom: 24 },
+  hint:       { color: "#64748b" },
+  empty:      { textAlign: "center", color: "#64748b", padding: "60px 0" },
+  list:       { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 20 },
+  card:       { background: "#1e293b", borderRadius: 14, padding: "20px 22px", border: "1px solid #334155" },
   cardHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
-  pedidoId: { fontWeight: "bold", color: "#111827", fontSize: 14 },
-  estadoBadge: { padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: "bold" },
-  descripcion: { margin: "0 0 12px", fontSize: 14, color: "#374151", lineHeight: 1.5 },
-  cardFooter: { display: "flex", justifyContent: "space-between", alignItems: "center" },
-  total: { color: "#111827", fontWeight: "bold", fontSize: 20 },
-  fecha: { color: "#6b7280", fontSize: 13 },
-  meta: { color: "#6b7280", fontSize: 12, margin: "4px 0 0" },
-  obs: { color: "#dc2626", fontSize: 12, margin: "4px 0 0" },
-  cancelBtn: {
-    width: "100%", marginTop: 12, padding: "10px", borderRadius: 8,
-    background: "#dc2626", color: "#fff", border: "none", cursor: "pointer",
-  },
-  modalBackdrop: {
-    position: "fixed", inset: 0, background: "rgba(0, 0, 0, 0.16)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
-  },
-  modal: {
-    background: "#fff", borderRadius: 16, padding: "24px", maxWidth: 520, width: "100%", boxShadow: "0 20px 60px rgba(15,23,42,0.08)", border: "1px solid #e5e7eb",
-  },
-  modalTitle: { margin: 0, color: "#b91c1c", fontSize: 20, marginBottom: 10 },
-  modalText: { color: "#6b7280", marginBottom: 18, fontSize: 14 },
-  modalTextarea: { width: "100%", padding: "12px 14px", borderRadius: 10, border: "1px solid #d1d5db", background: "#f8fafc", color: "#111827", outline: "none", resize: "vertical", fontSize: 14, minHeight: 112 },
-  modalActions: { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 },
-  modalCancelBtn: { padding: "10px 16px", borderRadius: 10, border: "1px solid #d1d5db", background: "#f3f4f6", color: "#111827", cursor: "pointer" },
-  modalSubmitBtn: { padding: "10px 16px", borderRadius: 10, border: "none", background: "#dc2626", color: "#fff", cursor: "pointer" },
+  pedidoId:   { fontWeight: "bold", fontSize: 15 },
+  estadoBadge:{ padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: "bold" },
+  descripcion:{ margin: "0 0 8px", fontSize: 14, color: "#cbd5e1", lineHeight: 1.5 },
+  meta:       { margin: "2px 0", fontSize: 12, color: "#64748b" },
+  obs:        { margin: "8px 0 0", fontSize: 12, color: "#f87171", fontStyle: "italic" },
+  cardFooter: { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, paddingTop: 12, borderTop: "1px solid #334155" },
+  total:      { color: "#4ade80", fontWeight: "bold", fontSize: 20 },
+  fecha:      { color: "#64748b", fontSize: 13 },
 };

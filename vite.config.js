@@ -12,6 +12,7 @@ export default defineConfig({
       '/productos': { target: 'http://localhost:8080', changeOrigin: true },
       '/carrito':   { target: 'http://localhost:8080', changeOrigin: true },
       '/pagos':     { target: 'http://localhost:8080', changeOrigin: true },
+      '/reportes':  { target: 'http://localhost:8080', changeOrigin: true },
     }
   }
 })
